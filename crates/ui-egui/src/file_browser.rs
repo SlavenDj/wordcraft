@@ -360,12 +360,14 @@ fn body(ui: &mut Ui, b: &mut FileBrowser, t: &Tokens) -> Option<Option<PathBuf>>
     let mut clicked: Option<Entry> = None;
     egui::Frame::NONE.fill(t.input).stroke(egui::Stroke::new(1.0, t.input_border)).inner_margin(2.0).show(ui, |ui| {
         let entries: &[Entry] = b.listing.as_ref().map(|l| l.entries.as_slice()).unwrap_or(&[]);
+        // An unreadable folder has its own message below; the hint is for a listing that came back empty.
+        let listed = b.listing.is_ok();
         egui::ScrollArea::vertical().max_height(300.0).min_scrolled_height(300.0).auto_shrink([false, false]).show_rows(
             ui,
             ROW,
             entries.len(),
             |ui, range| {
-                if entries.is_empty() {
+                if listed && entries.is_empty() {
                     // #3037: an empty folder (or a type filter that matches nothing) says so
                     // instead of showing a blank box.
                     ui.add_space(140.0);
