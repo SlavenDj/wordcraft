@@ -629,14 +629,16 @@ pub fn specs() -> Vec<CommandSpec> {
         .params(r#"{"header"?: pt, "footer"?: pt}"#),
         CommandSpec::new("table.cellMargins", "Cell Margins", "Table Layout › Alignment", |s, v| {
             let Some((tp, _, _)) = s.sel.focus.path.cell() else { return Err(CmdError::Disabled("not in a table".into())) };
+            let story = s.sel.focus.story;
+            // Only the sides the caller names change; the others keep their current values.
+            let current = s.doc.table(story, &tp).and_then(|t| t.props.cell_margins).unwrap_or([0.0, 5.4, 0.0, 5.4]);
             let m = [
-                p::f32(v, "top").unwrap_or(0.0),
-                p::f32(v, "left").unwrap_or(5.4),
-                p::f32(v, "bottom").unwrap_or(0.0),
-                p::f32(v, "right").unwrap_or(5.4),
+                p::f32(v, "top").unwrap_or(current[0]),
+                p::f32(v, "left").unwrap_or(current[1]),
+                p::f32(v, "bottom").unwrap_or(current[2]),
+                p::f32(v, "right").unwrap_or(current[3]),
             ]
             .map(|x| x.clamp(0.0, 144.0));
-            let story = s.sel.focus.story;
             s.doc.table_mut(story, &tp)?.props.cell_margins = Some(m);
             for path in s.doc.para_paths(story).into_iter().filter(|p| p.0.starts_with(&tp.0) && p.0.len() > tp.0.len()) {
                 s.doc.para_mut(story, &path)?.touch();
@@ -1956,6 +1958,17 @@ fn customize_ribbon(s: &mut Session, v: &Value) -> CmdResult {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cell_margins_keep_sides_not_passed() {
+        let mut s = Session::new(Document::new());
+        s.run("insert.table", &json!({"rows": 1, "cols": 1})).unwrap();
+        let (tp, _, _) = s.sel.focus.path.cell().unwrap();
+        s.run("table.cellMargins", &json!({"top": 20})).unwrap();
+        s.run("table.cellMargins", &json!({"left": 10})).unwrap();
+        let m = s.doc.table(StoryRef::Body, &tp).unwrap().props.cell_margins.unwrap();
+        assert_eq!(m, [20.0, 10.0, 0.0, 5.4]);
+    }
 
     #[test]
     fn compare_marks_changes() {
