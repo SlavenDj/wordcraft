@@ -456,11 +456,13 @@ fn link(s: &mut Session, v: &Value) -> CmdResult {
     sel_result(s)
 }
 
-/// Whether `name` can name a bookmark: starts with a letter, then letters, digits or `_`,
-/// at most 40 characters (as Word counts them, not UTF-8 bytes).
+/// Whether `name` can name a bookmark: a letter or `_` to start (Word's own hidden bookmarks
+/// are `_Ref…` and `_GoBack`), then letters, digits or `_`; at most 40 characters (as Word counts
+/// them, not UTF-8 bytes).
 pub fn bookmark_name_ok(name: &str) -> bool {
-    let mut chars = name.chars();
-    chars.next().is_some_and(char::is_alphabetic) && name.chars().count() <= 40 && chars.all(|c| c.is_alphanumeric() || c == '_')
+    name.chars().count() <= 40
+        && name.chars().next().is_some_and(|c| c.is_alphabetic() || c == '_')
+        && name.chars().all(|c| c.is_alphanumeric() || c == '_')
 }
 
 /// Where bookmark `name` is: see [`bookmark_span`]. `None` when there is no such bookmark.
@@ -1150,7 +1152,7 @@ mod tests {
         assert!(bookmark_name_ok(&"a".repeat(40)));
         assert!(!bookmark_name_ok(&"a".repeat(41)));
         assert!(!bookmark_name_ok("1foo"));
-        assert!(!bookmark_name_ok("_foo"));
+        assert!(bookmark_name_ok("_Hidden"), "hidden bookmarks start with _");
         assert!(!bookmark_name_ok("a&b"));
         assert!(!bookmark_name_ok("a!b"));
         assert!(!bookmark_name_ok("a b"));
