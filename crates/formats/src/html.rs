@@ -509,6 +509,8 @@ struct El {
     explicit_start: bool,
     /// Li: the item's number when it must start its own list run.
     item_start: Option<u32>,
+    /// Li: the first item of a top-level list, so it starts a run of its own (#3493).
+    item_restart: bool,
 }
 
 struct TableB {
@@ -776,6 +778,7 @@ impl<'r> Builder<'r> {
             let mut list_level: Option<(bool, u32)> = None;
             let mut li_at: Option<usize> = None;
             let mut item_start: Option<u32> = None;
+            let mut item_restart = false;
             let mut lists = 0usize;
             for (i, e) in self.stack.iter().enumerate().rev() {
                 match e.kind {
@@ -801,6 +804,7 @@ impl<'r> Builder<'r> {
                     ElKind::Li if li_at.is_none() => {
                         li_at = Some(i);
                         item_start = e.item_start;
+                        item_restart = e.item_restart;
                     }
                     ElKind::List(o) => {
                         if list_level.is_none() {
@@ -815,7 +819,12 @@ impl<'r> Builder<'r> {
                 }
             }
             if let (Some((o, list_start)), Some(li)) = (list_level, li_at) {
-                p.list = Some(ListInfo { ordered: o, level: lists.saturating_sub(1).min(8) as u8, start: item_start.unwrap_or(list_start) });
+                p.list = Some(ListInfo {
+                    ordered: o,
+                    level: lists.saturating_sub(1).min(8) as u8,
+                    start: item_start.unwrap_or(list_start),
+                    restart: item_restart,
+                });
                 self.para_cont = self.stack.get(li).is_some_and(|e| e.used);
                 if let Some(e) = self.stack.get_mut(li) {
                     e.used = true;
@@ -1179,9 +1188,16 @@ impl<'r> Builder<'r> {
             1
         };
         let mut item_start = None;
+        let mut item_restart = false;
         if name == "li" {
             let value = attr(attrs, "value").and_then(|v| v.trim().parse::<u32>().ok()).map(|n| n.clamp(1, 32767));
-            if let Some(list) = self.stack.iter_mut().rev().find(|e| matches!(e.kind, ElKind::List(_))) {
+            let at = self.stack.iter().rposition(|e| matches!(e.kind, ElKind::List(_)));
+            if let Some(k) = at {
+                // A new top-level list after another one stays its own run: two adjacent `<ol>`s
+                // number on as one list otherwise (#3493). The first item carries the break.
+                item_restart =
+                    !self.stack[..k].iter().any(|e| matches!(e.kind, ElKind::List(_))) && self.stack[k].next_item == self.stack[k].list_start;
+                let list = &mut self.stack[k];
                 let n = value.unwrap_or(list.next_item.max(1));
                 list.next_item = n.saturating_add(1);
                 if value.is_some() {
@@ -1315,6 +1331,7 @@ impl<'r> Builder<'r> {
             next_item: list_start,
             explicit_start: false,
             item_start,
+            item_restart,
         });
     }
 
