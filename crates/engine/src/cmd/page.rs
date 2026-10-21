@@ -77,7 +77,10 @@ pub fn specs() -> Vec<CommandSpec> {
                 if let Some(f) = fmt {
                     x.page_num_format = f;
                 }
-                x.page_num_start = start;
+                // Changing only the format leaves Start at alone; null clears it explicitly.
+                if v.get("start").is_some() {
+                    x.page_num_start = start;
+                }
             })
         })
         .params(r#"{"format"?: "decimal|lowerRoman|upperRoman|lowerLetter|upperLetter", "start"?: n}"#),
@@ -765,6 +768,17 @@ mod tests {
 
     fn doc() -> Session {
         Session::new(wordcraft_doc::Document::from_text("one\ntwo\nthree"))
+    }
+
+    #[test]
+    fn page_number_format_keeps_start_at() {
+        let mut s = doc();
+        s.run("layout.pageNumberFormat", &json!({"start": 5})).unwrap();
+        assert_eq!(sect(&s).page_num_start, Some(5));
+        s.run("layout.pageNumberFormat", &json!({"format": "lowerRoman"})).unwrap();
+        assert_eq!(sect(&s).page_num_start, Some(5), "only the format changed");
+        s.run("layout.pageNumberFormat", &json!({"start": null})).unwrap();
+        assert_eq!(sect(&s).page_num_start, None, "explicit null clears it");
     }
 
     fn with_section(f: impl Fn(&mut Value)) -> Value {
