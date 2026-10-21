@@ -832,12 +832,12 @@ pub fn format_date_parts(fmt: &str, y: i64, m: usize, d: u32, (hh, mm, ss): (u32
     while i < chars.len() {
         let c = chars.get(i).copied().unwrap_or(' ');
         // Text in single quotes is literal, and may itself contain `am/pm`.
-        if c == '\'' {
-            if let Some(end) = chars.get(i + 1..).and_then(|rest| rest.iter().position(|x| *x == '\'')).map(|n| i + 1 + n) {
-                out.extend(chars.get(i + 1..end).unwrap_or(&[]));
-                i = end + 1;
-                continue;
-            }
+        if c == '\''
+            && let Some(end) = chars.get(i + 1..).and_then(|rest| rest.iter().position(|x| *x == '\'')).map(|n| i + 1 + n)
+        {
+            out.extend(chars.get(i + 1..end).unwrap_or(&[]));
+            i = end + 1;
+            continue;
         }
         // `am/pm` (any case) is one token: AM or PM.
         if chars.get(i..i + 5).is_some_and(|w| w.iter().collect::<String>().eq_ignore_ascii_case("am/pm")) {
