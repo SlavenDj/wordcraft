@@ -603,7 +603,10 @@ fn convert_chars(src: &str, mode: &str, para_start: bool) -> Vec<String> {
                 } else {
                     lower(i, c)
                 };
-                if matches!(c, '.' | '!' | '?') {
+                // A decimal point is not the end of a sentence: `3.14 apples` keeps its case.
+                let decimal =
+                    c == '.' && i > 0 && chars.get(i - 1).is_some_and(|p| p.is_ascii_digit()) && chars.get(i + 1).is_some_and(|n| n.is_ascii_digit());
+                if !decimal && matches!(c, '.' | '!' | '?') {
                     up = true;
                 }
                 n
@@ -704,6 +707,7 @@ mod tests {
     #[test]
     fn case_conversions() {
         assert_eq!(convert("hello world. again", "sentence", true), "Hello world. Again");
+        assert_eq!(convert("one 3.14 apples and two 2.5 pears.", "sentence", true), "One 3.14 apples and two 2.5 pears.");
         assert_eq!(convert("hello WORLD", "title", true), "Hello World");
         assert_eq!(convert("Hello", "toggle", true), "hELLO");
         assert_eq!(convert("straße", "upper", true), "STRASSE");
